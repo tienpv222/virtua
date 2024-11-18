@@ -5,6 +5,7 @@ import {
   ReactNode,
   useRef,
   RefObject,
+  cloneElement
 } from "react";
 import {
   UPDATE_SCROLL_EVENT,
@@ -160,6 +161,13 @@ export interface VirtualizerProps {
    * Callback invoked when scrolling stops.
    */
   onScrollEnd?: () => void;
+  /**
+   * Enable unkeyed and pooled behavior:
+   * - If old item is unused, still render it offscreen
+   * - If new item is added, reuse an unused one if exists
+   * - This behavior doesn't guarantee DOM order
+   */
+  readonly unkeyed?: boolean;
 }
 
 /**
@@ -183,6 +191,7 @@ export const Virtualizer = forwardRef<VirtualizerHandle, VirtualizerProps>(
       scrollRef,
       onScroll: onScrollProp,
       onScrollEnd: onScrollEndProp,
+      unkeyed
     },
     ref
   ): ReactElement => {
@@ -231,6 +240,7 @@ export const Virtualizer = forwardRef<VirtualizerHandle, VirtualizerProps>(
     const totalSize = store._getTotalSize();
 
     const items: ReactElement[] = [];
+    const idxes: number[] = [];
 
     const getListItem = (index: number) => {
       const e = getElement(index);
@@ -323,6 +333,7 @@ export const Virtualizer = forwardRef<VirtualizerHandle, VirtualizerProps>(
 
     for (let i = startIndex, j = endIndex; i <= j; i++) {
       items.push(getListItem(i));
+      idxes.push(i);
     }
 
     if (keepMounted) {
@@ -331,14 +342,41 @@ export const Virtualizer = forwardRef<VirtualizerHandle, VirtualizerProps>(
       sort(keepMounted).forEach((index) => {
         if (index < startIndex) {
           startItems.push(getListItem(index));
+          idxes.push(index);
         }
         if (index > endIndex) {
           endItems.push(getListItem(index));
+          idxes.push(index);
         }
       });
 
       items.unshift(...startItems);
       items.push(...endItems);
+    }
+
+    const rendereds = useRef<number[]>([]).current;
+    const unuseds: number[] = [];
+
+    for (let i = 0; i < rendereds.length; ++i) {
+      if (!idxes.includes(rendereds[i]!)) unuseds.push(i);
+    }
+
+    for (let i = 0; i < idxes.length; ++i) {
+      if (rendereds.includes(idxes[i]!)) continue;
+
+      if (!unuseds.length) rendereds.push(idxes[i]!);
+
+      rendereds[unuseds.pop()!] = idxes[i]!;
+    }
+
+    if (unkeyed) {
+      items.length = rendereds.length;
+
+      for (let i = 0; i < rendereds.length; ++i) {
+        const el = getListItem(rendereds[i]!);
+
+        items[i] = cloneElement(el, { key: `:unkeyed:${i}` });
+      }
     }
 
     return (

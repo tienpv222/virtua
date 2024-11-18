@@ -30,6 +30,7 @@ export interface VListProps
       | "onScroll"
       | "onScrollEnd"
       | "keepMounted"
+      | "unkeyed"
     >,
     ViewportComponentAttributes {
   /**
@@ -57,6 +58,7 @@ export const VList = forwardRef<VListHandle, VListProps>(
       item,
       onScroll,
       onScrollEnd,
+      unkeyed,
       style,
       ...attrs
     },
@@ -80,6 +82,7 @@ export const VList = forwardRef<VListHandle, VListProps>(
         item={item}
         onScroll={onScroll}
         onScrollEnd={onScrollEnd}
+        unkeyed={unkeyed}
       >
         {children}
       </Virtualizer>
